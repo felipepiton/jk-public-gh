@@ -1,14 +1,28 @@
 pipeline {
     agent any
+    environment {
+    DOCKERHUB_CREDENTIALS = credentials('jk-dh-tk')
+    }
 
     stages {
-        stage('Cloning Git Repository') {
+        stage('SCM Checkout') {
             steps {
-                // Verifica a branch correta
-                git branch: 'main', url: 'https://github.com/felipepiton/jk-public-gh.git'
+                git branch: 'main', credentialsId: 'jk-gh-tk', url: 'https://github.com/felipepiton/jk-private-gh.git'
             }
         }
-
+        
+        stage('Build Docker Image') {
+            steps {
+                sh 'docker build -t felipepiton/webapp:$BUILD_NUMBER .'            
+            }
+        }
+           
+        stage('Login to Docker Hub') {
+            steps {
+                sh 'echo $DOCKERHUB_CREDENTIALS_PSW | docker login -u $DOCKERHUB_CREDENTIALS_USR --password-stdin'
+            }
+        }
+        
         stage('Building Image') {
             steps {
                 // Usa a variável BUILD_NUMBER para criar a tag da imagem
@@ -20,18 +34,11 @@ pipeline {
             steps {
                 // Para o contêiner se ele estiver em execução e o remove
                 sh '''
-                  # docker stop webapp_ctr || true
-                  # docker rm -f webapp_ctr || true
+                  docker stop webapp_ctr || true
+                  docker rm -f webapp_ctr || true
                   docker run --rm -d -p 3000:3000 --name webapp_ctr webapp:${BUILD_NUMBER}
                 '''
             }
-        }
-    }
-
-    post {
-        failure {
-            // Notifica quando o pipeline falha
-            echo 'Pipeline failed!'
         }
     }
 }
